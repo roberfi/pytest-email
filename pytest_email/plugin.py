@@ -82,6 +82,12 @@ def pytest_addoption(parser):
         help='Do not use SMTP AUTH'
     )
 
+    group.addoption(
+        '--eforcessl',
+        action='store_true',
+        help='If set, force secure connection when SSL is required and starttls is not supported'
+    )
+
 execution_date = "Today"
 
 def pytest_sessionstart(session):
@@ -111,13 +117,17 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         str(config.option.efrom),str(config.option.eto),str(total_tests),
         str(passed_tests),str(failed_tests), str(skipped_tests),str(error_tests),
         str(xpassed_tests), str(xfailed_tests), str(pass_percentage),
-        str(execution_date),str(round(duration,2)), str(config.option.eorg), not config.option.eanon)
+        str(execution_date),str(round(duration,2)), str(config.option.eorg), 
+        not config.option.eanon, config.option.eforcessl)
 
 def send_email(subject, smtp, user, pwd, efrom, to,
  total, passed, failed, skipped, error, xpassed, xfailed,
-  percentage, exe_date, elapsed_time, company_name, use_auth):
+ percentage, exe_date, elapsed_time, company_name, use_auth, force_ssl):
 
-    server = smtplib.SMTP(smtp)
+    if force_ssl:
+        server = smtplib.SMTP_SSL(smtp)
+    else:
+        server = smtplib.SMTP(smtp)
 
     # backward compatibility
     if not efrom:
@@ -273,7 +283,10 @@ def send_email(subject, smtp, user, pwd, efrom, to,
 
     msg.attach(MIMEText(email_content, 'html'))
 
-    server.starttls()
+    if not force_ssl:
+        server.starttls()
+    
     if use_auth:
         server.login(user, pwd)
+    
     server.send_message(msg)
